@@ -12,5 +12,5 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 
 #: Caminho do CSV de câncer de mama (env ``CANCER_MAMA_CSV`` sobrescreve o padrão do repo).
 CANCER_MAMA_CSV: Path = Path(
-    os.getenv("CANCER_MAMA_CSV", PROJECT_ROOT / "data" / "cancer_mama" / "data.csv")
+    os.getenv("CANCER_MAMA_CSV", PROJECT_ROOT / "data" / "cancer-mama-diagnostico" / "data.csv")
 )
