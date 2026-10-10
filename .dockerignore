@@ -1,0 +1,14 @@
+.git/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.specify/
+.claude/
+specs/
+*.log
+.DS_Store
+Thumbs.db

@@ -1,50 +1,97 @@
-# Tech Challenge Fase 1 — Suporte ao Diagnóstico com Machine Learning
+# Tech Challenge — Fase 1 | IA para Diagnóstico de Câncer de Mama
 
-FIAP Pós Tech · IA para Devs. Sistema de apoio ao diagnóstico usando aprendizado de máquina.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iigormatos/tech-challenge-fase1-v1/blob/joao-augusto/notebooks/01_principal.ipynb)
+
+Sistema de apoio ao diagnóstico de câncer de mama (**maligno × benigno**) com Machine Learning sobre
+dados tabulares (*Breast Cancer Wisconsin*). Projeto da Pós-Tech FIAP — IA para Devs.
 
 ## Problema
 
-Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since 1966, when designers at Letraset and James Mosley, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset's Body Type sheets. It has survived not only many decades, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised thanks to these sheets and more recently with desktop publishing software like Aldus PageMaker and Microsoft Word including versions of Lorem Ipsum.
+Hospitais precisam triar exames de câncer de mama com rapidez e segurança. Este projeto treina e avalia
+modelos de classificação que, a partir de 30 medidas numéricas de núcleos celulares (raio, textura,
+perímetro, área, concavidade etc.), estimam se um tumor é **maligno** ou **benigno**.
 
-## Datasets
-
-### Câncer de Mama — já incluído em `data/cancer-mama-diagnostico/data.csv`
-
-Versionado no repositório (569 registros, 32 colunas).
-
-- Kaggle: https://www.kaggle.com/datasets/uciml/breast-cancer-wisconsin-data/data
-
+A métrica prioritária é o **recall da classe maligna (sensibilidade)**: deixar de identificar um tumor
+maligno (**falso negativo**) tem custo clínico muito maior do que um falso positivo. Por isso o modelo
+é calibrado para minimizar falsos negativos mantendo a especificidade sob controle, e a **acurácia não
+é usada como métrica principal** (a base é desbalanceada, ~63% benigno / ~37% maligno). O sistema é uma
+**ferramenta de suporte** — o diagnóstico e o laudo final são sempre do médico.
 
 ## Estrutura do projeto
 
 ```text
-.
-├── data/
-│   └── cancer-mama-diagnostico/data.csv        # versionado
-│   
-├── notebooks/
-│   └── 01_principal.ipynb   # tarefa principal
-│   
-├── src/
-│   
-├── scripts/
-│   
-├── requirements.txt                 # dependências da tarefa principal
-└── README.md
+src/
+├── config.py          # semente (RANDOM_STATE) e caminhos (fonte única, sem hardcode)
+└── data.py            # carga, tradução de colunas (PT) e split estratificado 70/15/15
+notebooks/
+└── 01_principal.ipynb # notebook auto-contido: EDA → pré-proc → modelos → avaliação → interpretação
+tests/
+└── test_data.py       # testes de src/data.py (pytest)
+reports/
+├── figures/           # figuras geradas (PNG)
+├── relatorio_tecnico.md
+└── roteiro_video.md
+models/                # modelo final persistido (gerado ao rodar o notebook)
+Dockerfile · requirements.txt
 ```
+
+> **Organização do código (decisão do grupo).** Para manter o código didático, próximo das aulas, a
+> maior parte da lógica vive em células do notebook (cada função definida uma única vez e reutilizada).
+> Apenas `src/config.py` e `src/data.py` ficam em módulos — são o ponto único de semente/caminhos e a
+> fronteira de carga/divisão dos dados.
 
 ## Como executar
 
-### No Google Colab
+Pré-requisito: o dataset já está em `data/cancer-mama-diagnostico/data.csv`.
 
-O ambiente do grupo. Abra cada notebook pelo badge (repositório público, sem token):
+### 1. Local (VSCode / Jupyter)
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iigormatos/tech-challenge-fase1-v1/blob/main/notebooks/01_principal.ipynb) **Notebook 01 — Câncer de Mama**
+```bash
+python -m venv .venv
+source .venv/Scripts/activate      # Windows (Git Bash);  Linux/Mac: source .venv/bin/activate
+pip install -r requirements.txt
+jupyter notebook notebooks/01_principal.ipynb   # ou "Run All"
+# Alternativa não-interativa:
+jupyter nbconvert --to notebook --execute notebooks/01_principal.ipynb --output 01_principal.ipynb
+```
+
+### 2. Google Colab
+
+Clique no badge acima. A primeira célula clona o repositório, instala as dependências de
+`requirements.txt` e ajusta os caminhos automaticamente. Depois use **Ambiente de execução → Executar
+tudo**.
+
+### 3. Docker
+
+```bash
+docker build -t cancer-mama .
+docker run --rm -v "$PWD/reports:/app/reports" -v "$PWD/models:/app/models" cancer-mama
+```
+
+O container executa o notebook do início ao fim via `nbconvert`, gerando as figuras em `reports/figures/`
+e o modelo em `models/`.
+
+## Testes
+
+```bash
+pytest tests/test_data.py
+```
+
+## Resultados
+
+Ao rodar o notebook são produzidos: a EDA por classe (com discussão), a tabela comparativa dos quatro
+modelos (validação × teste) com recall, precision, F1, especificidade, ROC-AUC, PR-AUC e falsos
+negativos, as curvas ROC/PR/limiar, a interpretabilidade (SHAP global e individual, coeficientes da
+Regressão Logística, *permutation importance*) e o modelo final persistido em `models/`. Veja o
+[relatório técnico](reports/relatorio_tecnico.md).
+
+## Modelos utilizados
+
+Regressão Logística, Random Forest, SVM (RBF) e KNN (o edital exige duas ou mais técnicas). Os três
+primeiros usam `class_weight="balanced"`; o KNN não suporta ponderação e depende apenas do limiar de
+decisão escolhido na validação.
 
 ## Integrantes
 
-Bianca Maciel - RM376200
-Eduardo O Charrone - RM377641
-Guilherme Mendes Alburquerque - RM378723
-Igor Matos de Andrade - RM377344
-João Augusto Gonçalves de Aragão - RM377385
+Bianca Maciel (RM376200) · Eduardo O. Charrone (RM377641) · Guilherme Mendes Alburquerque (RM378723) ·
+Igor Matos de Andrade (RM377344) · João Augusto Gonçalves de Aragão (RM377385)
