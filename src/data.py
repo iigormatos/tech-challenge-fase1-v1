@@ -18,7 +18,7 @@ from .config import CANCER_MAMA_CSV, RANDOM_STATE
 #: Nome da coluna-alvo já traduzida.
 COLUNA_ALVO: str = "diagnostico"
 
-#: Tradução das 30 features + alvo para ``snake_case`` em português (aplicada 1×).
+#: Tradução das 30 variáveis características + alvo para ``snake_case`` em português (aplicada 1×).
 TRADUCAO_COLUNAS: dict[str, str] = {
     "diagnosis": "diagnostico",
     # --- média (_mean → _medio) ---
@@ -57,6 +57,10 @@ TRADUCAO_COLUNAS: dict[str, str] = {
 }
 
 #: Codificação do alvo: maligno é a classe positiva (1).
+#: Usa-se um mapa explícito em vez de ``LabelEncoder``: o
+#: resultado numérico é o mesmo — o encoder ordenaria os rótulos (B < M -> B=0, M=1) —,
+#: mas o mapa deixa explícito que maligno=1 é a classe positiva, o que importa porque a
+#: métrica central do projeto é o recall da classe maligna.
 MAPA_ALVO: dict[str, int] = {"M": 1, "B": 0}
 
 
