@@ -1,6 +1,6 @@
 # Tech Challenge — Fase 1 | IA para Diagnóstico de Câncer de Mama
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iigormatos/tech-challenge-fase1-v1/blob/joao-augusto/notebooks/01_principal.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iigormatos/tech-challenge-fase1-v1/blob/igor/notebooks/01_principal.ipynb)
 
 Sistema de apoio ao diagnóstico de câncer de mama (**maligno × benigno**) com Machine Learning sobre
 dados tabulares (*Breast Cancer Wisconsin*). Projeto da Pós-Tech FIAP — IA para Devs.
@@ -25,20 +25,12 @@ src/
 └── data.py            # carga, tradução de colunas (PT) e split estratificado 70/15/15
 notebooks/
 └── 01_principal.ipynb # notebook auto-contido: EDA → pré-proc → modelos → avaliação → interpretação
-tests/
-└── test_data.py       # testes de src/data.py (pytest)
 reports/
-├── figures/           # figuras geradas (PNG)
-├── relatorio_tecnico.md
-└── roteiro_video.md
+└── figures/           # figuras geradas (PNG)
+
 models/                # modelo final persistido (gerado ao rodar o notebook)
 Dockerfile · requirements.txt
 ```
-
-> **Organização do código (decisão do grupo).** Para manter o código didático, próximo das aulas, a
-> maior parte da lógica vive em células do notebook (cada função definida uma única vez e reutilizada).
-> Apenas `src/config.py` e `src/data.py` ficam em módulos — são o ponto único de semente/caminhos e a
-> fronteira de carga/divisão dos dados.
 
 ## Como executar
 
@@ -71,23 +63,16 @@ docker run --rm -v "$PWD/reports:/app/reports" -v "$PWD/models:/app/models" canc
 O container executa o notebook do início ao fim via `nbconvert`, gerando as figuras em `reports/figures/`
 e o modelo em `models/`.
 
-## Testes
-
-```bash
-pytest tests/test_data.py
-```
-
 ## Resultados
 
 Ao rodar o notebook são produzidos: a EDA por classe (com discussão), a tabela comparativa dos quatro
 modelos (validação × teste) com recall, precision, F1, especificidade, ROC-AUC, PR-AUC e falsos
 negativos, as curvas ROC/PR/limiar, a interpretabilidade (SHAP global e individual, coeficientes da
-Regressão Logística, *permutation importance*) e o modelo final persistido em `models/`. Veja o
-[relatório técnico](reports/relatorio_tecnico.md).
+Regressão Logística, *permutation importance*) e o modelo final persistido em `models/`.
 
 ## Modelos utilizados
 
-Regressão Logística, Random Forest, SVM (RBF) e KNN (o edital exige duas ou mais técnicas). Os três
+Regressão Logística, Random Forest, SVM (RBF) e KNN. Os três
 primeiros usam `class_weight="balanced"`; o KNN não suporta ponderação e depende apenas do limiar de
 decisão escolhido na validação.
 
