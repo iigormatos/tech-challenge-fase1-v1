@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Executa o notebook principal do início ao fim; falha o build se qualquer célula quebrar.
+# OBS.: o notebook EXTRA (notebooks/02_extra.ipynb, CNN) NÃO é executado aqui — exige o
+# dataset de imagem CBIS-DDSM (~5,8 GB, não versionado) montado em data/cancer-mama-deteccao
+# e é pesado para CPU. Rode-o preferencialmente no Colab (GPU) ou localmente via nbconvert.
 CMD ["jupyter", "nbconvert", "--to", "notebook", "--execute", \
      "--ExecutePreprocessor.timeout=600", \
      "--output", "01_principal.executado.ipynb", \

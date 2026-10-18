@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dataset de imagem CBIS-DDSM (~5,8 GB) — nao versionar; ver README para download.
+/data/cancer-mama-deteccao/jpeg/
+/data/cancer-mama-deteccao/csv/
+/models/*.keras

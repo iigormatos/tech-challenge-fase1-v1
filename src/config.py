@@ -14,3 +14,10 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 CANCER_MAMA_CSV: Path = Path(
     os.getenv("CANCER_MAMA_CSV", PROJECT_ROOT / "data" / "cancer-mama-diagnostico" / "data.csv")
 )
+
+#: Raiz do dataset de imagem (CBIS-DDSM) usado no notebook extra de CNN.
+#: Espera subpastas ``csv/`` (descrições de caso + dicom_info) e ``jpeg/<SeriesUID>/*.jpg``.
+#: A env ``CANCER_MAMA_IMG_DIR`` sobrescreve o padrão do repo.
+CANCER_MAMA_IMG_DIR: Path = Path(
+    os.getenv("CANCER_MAMA_IMG_DIR", PROJECT_ROOT / "data" / "cancer-mama-deteccao")
+)

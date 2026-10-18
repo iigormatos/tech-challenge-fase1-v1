@@ -11,9 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
-from .config import CANCER_MAMA_CSV, RANDOM_STATE
+from .config import CANCER_MAMA_CSV, CANCER_MAMA_IMG_DIR, RANDOM_STATE
 
 #: Nome da coluna-alvo já traduzida.
 COLUNA_ALVO: str = "diagnostico"
@@ -122,3 +122,135 @@ def dividir_treino_val_teste(
         X_temp, y_temp, test_size=0.50, stratify=y_temp, random_state=random_state
     )
     return X_treino, X_val, X_teste, y_treino, y_val, y_teste
+
+
+# ---------------------------------------------------------------------------
+# Item EXTRA (visão computacional / CNN): catálogo de imagens do CBIS-DDSM.
+# Mesma fronteira de carga/split do tabular — fica em ``src/`` por ser onde o
+# vazamento começaria. A entrada do modelo são os recortes de
+# lesão (``cropped images``); o rótulo vem de ``pathology``.
+# ---------------------------------------------------------------------------
+
+#: Mapeamento do rótulo de patologia para binário (maligno=1). ``BENIGN_WITHOUT_CALLBACK``
+#: é achado benigno que não exigiu retorno -> tratado como benigno.
+MAPA_PATOLOGIA: dict[str, int] = {
+    "MALIGNANT": 1,
+    "BENIGN": 0,
+    "BENIGN_WITHOUT_CALLBACK": 0,
+}
+
+#: Arquivos de descrição de caso por tipo de achado (train/test oficiais do dataset).
+_ARQUIVOS_CASO: dict[str, tuple[str, str]] = {
+    "massa": ("mass_case_description_train_set.csv", "mass_case_description_test_set.csv"),
+    "calcificacao": ("calc_case_description_train_set.csv", "calc_case_description_test_set.csv"),
+}
+
+
+def _mapa_uid_para_jpeg(csv_dir: Path) -> dict[str, str]:
+    """Mapeia ``SeriesInstanceUID`` -> caminho relativo ``<UID>/<arquivo>.jpg``.
+
+    Usa ``dicom_info.csv``, preferindo as linhas ``cropped images`` (a entrada do
+    modelo). O ``image_path`` tem o prefixo ``CBIS-DDSM/jpeg/``; guardamos só a
+    parte após ``jpeg/`` para casar com a pasta local ``jpeg/<UID>/``.
+    """
+    di = pd.read_csv(
+        csv_dir / "dicom_info.csv",
+        usecols=["image_path", "SeriesDescription", "SeriesInstanceUID"],
+    )
+    mapa: dict[str, str] = {}
+    cropped = di[di["SeriesDescription"] == "cropped images"]
+    for sub in (cropped, di):  # 1º passo: só cropped; 2º: fallback para qualquer série
+        for uid, img in zip(sub["SeriesInstanceUID"], sub["image_path"]):
+            if isinstance(img, str) and uid not in mapa:
+                mapa[uid] = img.split("jpeg/")[-1]
+    return mapa
+
+
+def construir_catalogo_imagens(img_dir: Path = CANCER_MAMA_IMG_DIR) -> pd.DataFrame:
+    """Constrói o catálogo de recortes de lesão (massa + calcificação, train + test).
+
+    Para cada linha das descrições de caso, extrai o ``SeriesInstanceUID`` do
+    ``cropped image file path`` (penúltimo segmento), resolve o JPEG via
+    ``dicom_info.csv`` e verifica a existência do arquivo. Linhas sem arquivo ou
+    sem rótulo mapeável são descartadas; a contagem fica em ``catalogo.attrs["descartados"]``.
+
+    Colunas: ``caminho_imagem, paciente, diagnostico, tipo_achado, vista, densidade, origem``.
+    """
+    img_dir = Path(img_dir)
+    csv_dir = img_dir / "csv"
+    jpeg_dir = img_dir / "jpeg"
+    mapa = _mapa_uid_para_jpeg(csv_dir)
+
+    registros: list[dict] = []
+    descartados = 0
+    for tipo, (arq_treino, arq_teste) in _ARQUIVOS_CASO.items():
+        for origem, arq in (("train", arq_treino), ("test", arq_teste)):
+            df = pd.read_csv(csv_dir / arq)
+            col_dens = "breast_density" if "breast_density" in df.columns else "breast density"
+            for _, r in df.iterrows():
+                partes = str(r["cropped image file path"]).strip().split("/")
+                if len(partes) < 2:
+                    descartados += 1
+                    continue
+                rel = mapa.get(partes[-2])
+                patologia = MAPA_PATOLOGIA.get(str(r["pathology"]).strip())
+                if rel is None or patologia is None:
+                    descartados += 1
+                    continue
+                caminho = jpeg_dir / Path(rel)
+                if not caminho.exists():
+                    descartados += 1
+                    continue
+                registros.append({
+                    "caminho_imagem": str(caminho.resolve()),
+                    "paciente": r["patient_id"],
+                    "diagnostico": patologia,
+                    "tipo_achado": tipo,
+                    "vista": r.get("image view"),
+                    "densidade": r.get(col_dens),
+                    "origem": origem,
+                })
+
+    catalogo = pd.DataFrame(registros)
+    catalogo.attrs["descartados"] = descartados
+    return catalogo
+
+
+def dividir_por_paciente(
+    catalogo: pd.DataFrame,
+    frac_val: float = 0.15,
+    random_state: int = RANDOM_STATE,
+):
+    """Divide o catálogo em treino / validação / teste SEM vazamento de paciente.
+
+    - Teste = linhas com ``origem == "test"`` (split oficial do dataset).
+    - Validação = ~``frac_val`` dos PACIENTES do treino (``GroupShuffleSplit`` por
+      ``paciente``); o restante é treino.
+
+    Como unimos massa + calcificação, um mesmo ``patient_id`` pode constar no treino
+    de um tipo e no teste do outro; esses pacientes são REMOVIDOS do pool de treino
+    (o teste oficial é preservado intacto) para não haver vazamento. A contagem de
+    imagens removidas fica em ``df_treino.attrs["removidos_overlap_teste"]``.
+
+    Garante, por asserção, que nenhum paciente aparece em mais de um conjunto.
+    Retorna ``(df_treino, df_val, df_teste)``.
+    """
+    teste = catalogo[catalogo["origem"] == "test"].reset_index(drop=True)
+    pacientes_teste = set(teste["paciente"])
+
+    treino_val = catalogo[catalogo["origem"] == "train"].reset_index(drop=True)
+    n_antes = len(treino_val)
+    treino_val = treino_val[~treino_val["paciente"].isin(pacientes_teste)].reset_index(drop=True)
+    removidos = n_antes - len(treino_val)
+
+    gss = GroupShuffleSplit(n_splits=1, test_size=frac_val, random_state=random_state)
+    idx_treino, idx_val = next(gss.split(treino_val, groups=treino_val["paciente"]))
+    treino = treino_val.iloc[idx_treino].reset_index(drop=True)
+    val = treino_val.iloc[idx_val].reset_index(drop=True)
+
+    p_tr, p_val, p_te = set(treino["paciente"]), set(val["paciente"]), set(teste["paciente"])
+    assert not (p_tr & p_val), "vazamento de paciente entre treino e validação"
+    assert not (p_tr & p_te), "vazamento de paciente entre treino e teste"
+    assert not (p_val & p_te), "vazamento de paciente entre validação e teste"
+    treino.attrs["removidos_overlap_teste"] = removidos
+    return treino, val, teste

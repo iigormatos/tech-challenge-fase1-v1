@@ -9,6 +9,10 @@ __pycache__/
 .specify/
 .claude/
 specs/
+# Dataset de imagem CBIS-DDSM (~5,8 GB): não embutir na imagem — montar via volume no docker run.
+data/cancer-mama-deteccao/jpeg/
+data/cancer-mama-deteccao/csv/
+models/*.keras
 *.log
 .DS_Store
 Thumbs.db
