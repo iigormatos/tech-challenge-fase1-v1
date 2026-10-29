@@ -1,11 +1,4 @@
-"""Carga, limpeza, tradução e divisão dos dados de câncer de mama.
-
-Único ponto do projeto onde o CSV bruto é lido, as colunas são traduzidas para
-``snake_case`` em português e os dados são divididos de forma estratificada em
-treino / validação / teste. Mantido em ``src/`` por ser a fronteira onde um
-vazamento começaria (constitution V).
-"""
-
+# importação de bibliotecas
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,10 +8,10 @@ from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
 from .config import CANCER_MAMA_CSV, CANCER_MAMA_IMG_DIR, RANDOM_STATE
 
-#: Nome da coluna-alvo já traduzida.
+# Nome da coluna-alvo. Já traduzida.
 COLUNA_ALVO: str = "diagnostico"
 
-#: Tradução das 30 variáveis características + alvo para ``snake_case`` em português (aplicada 1×).
+# Tradução das 30 variáveis características .
 TRADUCAO_COLUNAS: dict[str, str] = {
     "diagnosis": "diagnostico",
     # --- média (_mean → _medio) ---
@@ -56,22 +49,12 @@ TRADUCAO_COLUNAS: dict[str, str] = {
     "fractal_dimension_worst": "dimensao_fractal_pior",
 }
 
-#: Codificação do alvo: maligno é a classe positiva (1).
-#: Usa-se um mapa explícito em vez de ``LabelEncoder``: o
-#: resultado numérico é o mesmo — o encoder ordenaria os rótulos (B < M -> B=0, M=1) —,
-#: mas o mapa deixa explícito que maligno=1 é a classe positiva, o que importa porque a
-#: métrica central do projeto é o recall da classe maligna.
+# Codificação do alvo: maligno é a classe positiva (1).
 MAPA_ALVO: dict[str, int] = {"M": 1, "B": 0}
 
-
+# Lê o CSV, descarta colunas sem valor, traduz nomes e codifica o alvo.
+# Remove ``id`` (identificador) e colunas invalidas
 def carregar_dados(caminho: Path = CANCER_MAMA_CSV) -> pd.DataFrame:
-    """Lê o CSV, descarta colunas sem valor, traduz nomes e codifica o alvo.
-
-    - Remove ``id`` (identificador) e colunas espúrias totalmente vazias
-      (ex.: ``Unnamed: 32`` gerada pela vírgula final do cabeçalho).
-    - Traduz as colunas uma única vez para ``snake_case`` em português.
-    - Codifica ``diagnostico`` como ``1`` (maligno) / ``0`` (benigno).
-    """
     df = pd.read_csv(caminho)
 
     # Descarta identificador e qualquer coluna "Unnamed" totalmente vazia.
@@ -82,13 +65,7 @@ def carregar_dados(caminho: Path = CANCER_MAMA_CSV) -> pd.DataFrame:
     df[COLUNA_ALVO] = df[COLUNA_ALVO].map(MAPA_ALVO).astype(int)
     return df
 
-
 def checar_qualidade(df: pd.DataFrame) -> dict:
-    """Retorna diagnóstico de qualidade dos dados (não altera ``df``).
-
-    Inclui contagem de nulos por coluna, total de nulos, linhas duplicadas e a
-    distribuição absoluta e relativa das classes do alvo.
-    """
     contagem_classes = df[COLUNA_ALVO].value_counts().sort_index()
     return {
         "nulos_por_coluna": df.isnull().sum(),
@@ -98,20 +75,12 @@ def checar_qualidade(df: pd.DataFrame) -> dict:
         "distribuicao_classes_pct": (contagem_classes / len(df) * 100).round(2),
     }
 
-
+# Divide ``df`` em treino / validação / teste 70/15/15
 def dividir_treino_val_teste(
     df: pd.DataFrame,
     alvo: str = COLUNA_ALVO,
     random_state: int = RANDOM_STATE,
 ):
-    """Divide ``df`` em treino / validação / teste 70/15/15, estratificado.
-
-    Feito em dois passos (70/30 e depois 30 → 15/15) sempre com ``stratify`` pelo
-    alvo, preservando a proporção de classes (~63/37) nos três conjuntos. Nenhuma
-    linha é removida.
-
-    Retorna ``(X_treino, X_val, X_teste, y_treino, y_val, y_teste)``.
-    """
     X = df.drop(columns=[alvo])
     y = df[alvo]
 
@@ -126,20 +95,13 @@ def dividir_treino_val_teste(
 
 # ---------------------------------------------------------------------------
 # Item EXTRA (visão computacional / CNN): catálogo de imagens do CBIS-DDSM.
-# Mesma fronteira de carga/split do tabular — fica em ``src/`` por ser onde o
-# vazamento começaria. A entrada do modelo são os recortes de
-# lesão (``cropped images``); o rótulo vem de ``pathology``.
-# ---------------------------------------------------------------------------
-
-#: Mapeamento do rótulo de patologia para binário (maligno=1). ``BENIGN_WITHOUT_CALLBACK``
-#: é achado benigno que não exigiu retorno -> tratado como benigno.
 MAPA_PATOLOGIA: dict[str, int] = {
     "MALIGNANT": 1,
     "BENIGN": 0,
     "BENIGN_WITHOUT_CALLBACK": 0,
 }
 
-#: Arquivos de descrição de caso por tipo de achado (train/test oficiais do dataset).
+# Arquivos de descrição de caso por tipo de achado (train/test oficiais do dataset).
 _ARQUIVOS_CASO: dict[str, tuple[str, str]] = {
     "massa": ("mass_case_description_train_set.csv", "mass_case_description_test_set.csv"),
     "calcificacao": ("calc_case_description_train_set.csv", "calc_case_description_test_set.csv"),
@@ -147,12 +109,6 @@ _ARQUIVOS_CASO: dict[str, tuple[str, str]] = {
 
 
 def _mapa_uid_para_jpeg(csv_dir: Path) -> dict[str, str]:
-    """Mapeia ``SeriesInstanceUID`` -> caminho relativo ``<UID>/<arquivo>.jpg``.
-
-    Usa ``dicom_info.csv``, preferindo as linhas ``cropped images`` (a entrada do
-    modelo). O ``image_path`` tem o prefixo ``CBIS-DDSM/jpeg/``; guardamos só a
-    parte após ``jpeg/`` para casar com a pasta local ``jpeg/<UID>/``.
-    """
     di = pd.read_csv(
         csv_dir / "dicom_info.csv",
         usecols=["image_path", "SeriesDescription", "SeriesInstanceUID"],
@@ -167,15 +123,6 @@ def _mapa_uid_para_jpeg(csv_dir: Path) -> dict[str, str]:
 
 
 def construir_catalogo_imagens(img_dir: Path = CANCER_MAMA_IMG_DIR) -> pd.DataFrame:
-    """Constrói o catálogo de recortes de lesão (massa + calcificação, train + test).
-
-    Para cada linha das descrições de caso, extrai o ``SeriesInstanceUID`` do
-    ``cropped image file path`` (penúltimo segmento), resolve o JPEG via
-    ``dicom_info.csv`` e verifica a existência do arquivo. Linhas sem arquivo ou
-    sem rótulo mapeável são descartadas; a contagem fica em ``catalogo.attrs["descartados"]``.
-
-    Colunas: ``caminho_imagem, paciente, diagnostico, tipo_achado, vista, densidade, origem``.
-    """
     img_dir = Path(img_dir)
     csv_dir = img_dir / "csv"
     jpeg_dir = img_dir / "jpeg"
@@ -215,26 +162,13 @@ def construir_catalogo_imagens(img_dir: Path = CANCER_MAMA_IMG_DIR) -> pd.DataFr
     catalogo.attrs["descartados"] = descartados
     return catalogo
 
-
+# Divide o catálogo em treino / validação / teste SEM vazamento de paciente.
+#  Garante, por asserção, que nenhum paciente aparece em mais de um conjunto.
 def dividir_por_paciente(
     catalogo: pd.DataFrame,
     frac_val: float = 0.15,
     random_state: int = RANDOM_STATE,
 ):
-    """Divide o catálogo em treino / validação / teste SEM vazamento de paciente.
-
-    - Teste = linhas com ``origem == "test"`` (split oficial do dataset).
-    - Validação = ~``frac_val`` dos PACIENTES do treino (``GroupShuffleSplit`` por
-      ``paciente``); o restante é treino.
-
-    Como unimos massa + calcificação, um mesmo ``patient_id`` pode constar no treino
-    de um tipo e no teste do outro; esses pacientes são REMOVIDOS do pool de treino
-    (o teste oficial é preservado intacto) para não haver vazamento. A contagem de
-    imagens removidas fica em ``df_treino.attrs["removidos_overlap_teste"]``.
-
-    Garante, por asserção, que nenhum paciente aparece em mais de um conjunto.
-    Retorna ``(df_treino, df_val, df_teste)``.
-    """
     teste = catalogo[catalogo["origem"] == "test"].reset_index(drop=True)
     pacientes_teste = set(teste["paciente"])
 

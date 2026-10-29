@@ -11,12 +11,6 @@ Hospitais precisam triar exames de câncer de mama com rapidez e segurança. Est
 modelos de classificação que, a partir de 30 medidas numéricas de núcleos celulares (raio, textura,
 perímetro, área, concavidade etc.), estimam se um tumor é **maligno** ou **benigno**.
 
-A métrica prioritária é o **recall da classe maligna (sensibilidade)**: deixar de identificar um tumor
-maligno (**falso negativo**) tem custo clínico muito maior do que um falso positivo. Por isso o modelo
-é calibrado para minimizar falsos negativos mantendo a especificidade sob controle, e a **acurácia não
-é usada como métrica principal** (a base é desbalanceada, ~63% benigno / ~37% maligno). O sistema é uma
-**ferramenta de suporte** — o diagnóstico e o laudo final são sempre do médico.
-
 ## Estrutura do projeto
 
 ```text
